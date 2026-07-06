@@ -72,6 +72,29 @@ npm start
 docker compose up --build
 ```
 
+## CI/CD (Docker Registry)
+
+Bei jedem Push auf `main` baut [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) das Image und lädt es nach **GitHub Container Registry** hoch:
+
+```
+ghcr.io/hwkdo/teams-sdk-rest:latest
+ghcr.io/hwkdo/teams-sdk-rest:main
+ghcr.io/hwkdo/teams-sdk-rest:<git-sha>
+```
+
+Manuell starten: GitHub → Actions → **Docker Publish** → **Run workflow**.
+
+### Image pullen
+
+```bash
+echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+docker pull ghcr.io/hwkdo/teams-sdk-rest:latest
+```
+
+Für private Packages: unter GitHub → **Packages** → `teams-sdk-rest` → **Package settings** → Visibility anpassen oder Deploy-Token nutzen.
+
+Der Workflow nutzt `GITHUB_TOKEN` mit `packages: write` — keine zusätzlichen Secrets nötig.
+
 ## Umgebungsvariablen
 
 | Variable | Beschreibung |

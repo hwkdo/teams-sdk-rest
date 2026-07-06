@@ -1,0 +1,9 @@
+node_modules
+dist
+.git
+.github
+.env
+data
+*.md
+.cursor
+terminals
