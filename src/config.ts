@@ -13,6 +13,11 @@ const configSchema = z.object({
   WELCOME_MESSAGE: z
     .string()
     .default('Bot installiert — bereit für Benachrichtigungen.'),
+  HI_REPLY_MESSAGE: z
+    .string()
+    .default(
+      'Hallo! Schön, dass du da bist. Ich sende dir Benachrichtigungen aus dem HWKDO Intranet.',
+    ),
 });
 
 export type Config = z.infer<typeof configSchema>;
