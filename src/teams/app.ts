@@ -12,7 +12,6 @@ import { createMessagesRouter } from '../routes/messages.js';
 import { createConversationsRouter } from '../routes/conversations.js';
 import { createGraphRouter } from '../routes/graph.js';
 import { logInboundEvent } from '../lib/eventLogger.js';
-import { isFromBot, isHiCommand, normalizeActivityText } from '../lib/messageText.js';
 
 export type TeamsServices = {
   conversationStore: ConversationStore;
@@ -57,7 +56,7 @@ export function createTeamsApplication(config: Config, server: express.Express):
     await webhookForwarder.forward('install.remove', activity);
   });
 
-  teamsApp.on('message', async ({ activity, send }) => {
+  teamsApp.on('message', async ({ activity }) => {
     logInboundEvent('message', {
       conversationId: activity.conversation?.id,
       activityId: activity.id,
@@ -67,34 +66,11 @@ export function createTeamsApplication(config: Config, server: express.Express):
     });
 
     conversationStore.saveFromActivity(activity);
-
-    const text = normalizeActivityText(activity);
-
-    if (!isFromBot(activity, config.CLIENT_ID) && isHiCommand(text)) {
-      const hiReply = config.HI_REPLY_MESSAGE.trim();
-
-      if (hiReply !== '') {
-        await send(hiReply);
-        logInboundEvent('message.hi-reply', { conversationId: activity.conversation?.id });
-      }
-    }
-
     await webhookForwarder.forward('message', activity);
   });
 
-  teamsApp.on('mention', async ({ activity, send }) => {
+  teamsApp.on('mention', async ({ activity }) => {
     conversationStore.saveFromActivity(activity);
-
-    const text = normalizeActivityText(activity);
-
-    if (!isFromBot(activity, config.CLIENT_ID) && isHiCommand(text)) {
-      const hiReply = config.HI_REPLY_MESSAGE.trim();
-
-      if (hiReply !== '') {
-        await send(hiReply);
-      }
-    }
-
     await webhookForwarder.forward('mention', activity);
   });
 

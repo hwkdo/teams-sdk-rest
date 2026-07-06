@@ -106,7 +106,6 @@ Der Workflow nutzt `GITHUB_TOKEN` mit `packages: write` — keine zusätzlichen 
 | `LARAVEL_WEBHOOK_URL` | URL für Event-Weiterleitung (optional) |
 | `LARAVEL_WEBHOOK_SECRET` | HMAC-Secret für `X-Teams-Signature` (optional) |
 | `WELCOME_MESSAGE` | Willkommensnachricht bei `install.add` (leer = deaktiviert) |
-| `HI_REPLY_MESSAGE` | Antwort auf `Hi`/`Hello`/`Hallo` (Pflicht für Teams-App-Validierung) |
 | `DATA_DIR` | SQLite-Pfad (Default: `./data`, Docker: `/data`) |
 | `PORT` | HTTP-Port (Default: `3978`) |
 
@@ -121,58 +120,6 @@ Der Workflow nutzt `GITHUB_TOKEN` mit `packages: write` — keine zusätzlichen 
    - `Channel.ReadBasic.All`
 
 Ohne Bot-Installation schlagen proaktive Nachrichten fehl — das ist eine Teams-Plattform-Regel.
-
-## Teams Developer Portal — App-Validierung („Hi“-Befehl)
-
-Die Validierung prüft, ob der Bot auf den Manifest-Befehl **Hi** antwortet. Die Antwort erfolgt **direkt im Container** (vor dem Laravel-Webhook), damit das kurze Validierungs-Timeout eingehalten wird.
-
-### Manifest (`commandLists`)
-
-Im Teams-App-Manifest muss der Befehl deklariert sein, z. B.:
-
-```json
-"commandLists": [
-  {
-    "scopes": ["personal"],
-    "commands": [
-      {
-        "title": "Hi",
-        "description": "Begrüßung"
-      }
-    ]
-  }
-]
-```
-
-`bots[].botId` und `webApplicationInfo.id` müssen der Bot-App-ID entsprechen.
-
-### Container-Config
-
-```env
-HI_REPLY_MESSAGE=Hallo! Schön, dass du da bist. Ich sende dir Benachrichtigungen aus dem HWKDO Intranet.
-```
-
-Leerer Wert = keine Hi-Antwort → Validierung schlägt fehl.
-
-### Nach Deploy prüfen
-
-```bash
-docker compose up -d --build
-docker logs -f <teams-sdk-rest-container>
-```
-
-In Teams `Hi` an den Bot senden. Erwartetes Log:
-
-```
-[teams-sdk-rest] inbound event=message ... text=Hi
-[teams-sdk-rest] inbound event=message.hi-reply conversationId=...
-```
-
-Laravel antwortet **nicht** nochmals auf `Hi` (kein Doppel-Reply).
-
-### Bekannte Plattform-Probleme
-
-Microsoft hat wiederholt gemeldet, dass die Validierung manchmal **keine** `message`-Activity an den Bot sendet, trotzdem aber „Bot reagiert nicht auf Hi“ meldet. Wenn manuell alles funktioniert und `message.hi-reply` im Log erscheint, liegt es oft am Validator — ggf. erneut validieren oder Microsoft-Support.
 
 ## REST-API
 
