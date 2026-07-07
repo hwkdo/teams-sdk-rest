@@ -51,14 +51,15 @@ export class MessageService {
       return stored.conversationId;
     }
 
-    if (request.teamId && request.channelId) {
-      const stored = this.conversationStore.getByTeamChannel(request.teamId, request.channelId);
-      if (!stored) {
-        throw new Error(
-          `No conversation found for team ${request.teamId} channel ${request.channelId}. Install the bot in this team first.`,
-        );
-      }
-      return stored.conversationId;
+    if (request.channelId) {
+      const stored = request.teamId
+        ? this.conversationStore.getByTeamChannel(request.teamId, request.channelId)
+        : null;
+
+      // For a new top-level channel post the conversation id equals the channel
+      // thread id. A stored reference is only needed to reply into an existing
+      // thread, so fall back to the channel id when nothing is stored.
+      return stored?.conversationId ?? request.channelId;
     }
 
     throw new Error('Provide conversationId, userAadId, or teamId+channelId');
