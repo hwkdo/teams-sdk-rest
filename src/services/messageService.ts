@@ -16,9 +16,40 @@ export class MessageService {
   ) {}
 
   async send(request: SendMessageRequest): Promise<{ messageId: string; conversationId: string }> {
+    // A channel target without an explicit conversationId means we start a new
+    // top-level thread. Sending directly to the channel id triggers
+    // "BotNotInConversationRoster"; the Bot Connector requires creating a new
+    // conversation with channelData instead.
+    if (request.channelId && !request.conversationId) {
+      return this.sendToChannel(request);
+    }
+
     const target = this.resolveTarget(request);
     const activity = this.buildMessageActivity(request.text, request.html, request.card);
     return this.dispatch(target, activity);
+  }
+
+  private async sendToChannel(
+    request: SendMessageRequest,
+  ): Promise<{ messageId: string; conversationId: string }> {
+    const channelId = request.channelId!;
+    const activity = this.buildMessageActivity(request.text, request.html, request.card);
+    const app = this.getApp();
+
+    // Prefer a stored regional serviceUrl for this team/channel; otherwise fall
+    // back to the app's default API client.
+    const stored = request.teamId
+      ? this.conversationStore.getByTeamChannel(request.teamId, channelId)
+      : null;
+    const api = stored?.serviceUrl ? new ApiClient(stored.serviceUrl, app.api.http) : app.api;
+
+    const resource = await api.conversations.create({
+      isGroup: true,
+      channelData: { channel: { id: channelId } },
+      activity: toActivityParams(activity),
+    });
+
+    return { messageId: resource.activityId, conversationId: resource.id };
   }
 
   async reply(request: ReplyMessageRequest): Promise<{ messageId: string; conversationId: string }> {
