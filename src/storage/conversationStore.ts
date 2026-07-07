@@ -168,6 +168,13 @@ export class ConversationStore {
     return row ? this.toStoredConversation(row) : null;
   }
 
+  getByConversationId(conversationId: string): StoredConversation | null {
+    const row = this.db
+      .prepare(`SELECT * FROM conversations WHERE conversation_id = ? ORDER BY updated_at DESC LIMIT 1`)
+      .get(conversationId) as ConversationRow | undefined;
+    return row ? this.toStoredConversation(row) : null;
+  }
+
   list(limit = 50, offset = 0): StoredConversation[] {
     const rows = this.db
       .prepare(`SELECT * FROM conversations ORDER BY updated_at DESC LIMIT ? OFFSET ?`)
