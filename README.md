@@ -274,6 +274,34 @@ Webhook-Payload:
 
 Weitergeleitete Events: `message`, `mention`, `install.add`, `install.remove`, `conversationUpdate.channelMemberAdded`, `adaptive-card.action`
 
+### Adaptive Card Action (Invoke) — synchrone Antwort
+
+Bei `adaptive-card.action` wartet `teams-sdk-rest` auf die Laravel-Antwort (Timeout ~4s) und gibt sie als Bot-Framework-`InvokeResponse` an Teams zurück.
+
+Laravel sollte JSON liefern:
+
+```json
+{
+  "invokeResponse": {
+    "statusCode": 200,
+    "type": "application/vnd.microsoft.card.adaptive",
+    "value": { "type": "AdaptiveCard", "version": "1.5", "body": [] }
+  }
+}
+```
+
+Alternativ Message:
+
+```json
+{
+  "invokeResponse": {
+    "statusCode": 200,
+    "type": "application/vnd.microsoft.activity.message",
+    "value": "Freigegeben."
+  }
+}
+```
+
 ## Entwicklung
 
 ```bash

@@ -12,6 +12,24 @@ import { createMessagesRouter } from '../routes/messages.js';
 import { createConversationsRouter } from '../routes/conversations.js';
 import { createGraphRouter } from '../routes/graph.js';
 import { logInboundEvent } from '../lib/eventLogger.js';
+import type { AdaptiveCardActionResponse } from '@microsoft/teams.api';
+
+function extractAdaptiveCardInvokeBody(body: unknown): AdaptiveCardActionResponse | null {
+  if (!body || typeof body !== 'object') {
+    return null;
+  }
+
+  const record = body as Record<string, unknown>;
+  const candidate = (record.invokeResponse && typeof record.invokeResponse === 'object'
+    ? record.invokeResponse
+    : record) as Record<string, unknown>;
+
+  if (typeof candidate.statusCode !== 'number' || typeof candidate.type !== 'string') {
+    return null;
+  }
+
+  return candidate as AdaptiveCardActionResponse;
+}
 
 export type TeamsServices = {
   conversationStore: ConversationStore;
@@ -79,11 +97,26 @@ export function createTeamsApplication(config: Config, server: express.Express):
     await webhookForwarder.forward('conversationUpdate.channelMemberAdded', activity);
   });
 
-  teamsApp.on('invoke', async ({ activity }) => {
-    if (activity.name === 'adaptiveCard/action') {
-      conversationStore.saveFromActivity(activity);
-      await webhookForwarder.forward('adaptive-card.action', activity);
+  teamsApp.on('card.action', async ({ activity }) => {
+    conversationStore.saveFromActivity(activity);
+
+    const result = await webhookForwarder.forward('adaptive-card.action', activity, {
+      timeoutMs: 4_000,
+    });
+
+    const invokeBody = extractAdaptiveCardInvokeBody(result.body);
+
+    if (invokeBody) {
+      return invokeBody;
     }
+
+    return {
+      statusCode: 200 as const,
+      type: 'application/vnd.microsoft.activity.message' as const,
+      value: result.ok
+        ? 'Aktion verarbeitet.'
+        : 'Die Aktion konnte nicht verarbeitet werden. Bitte im Intranet fortsetzen.',
+    };
   });
 
   const apiAuth = createApiAuth(config);

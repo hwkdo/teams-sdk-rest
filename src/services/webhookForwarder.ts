@@ -4,6 +4,12 @@ import type { Config } from '../config.js';
 import type { WebhookPayload } from '../types/api.js';
 import { logWebhookForward } from '../lib/eventLogger.js';
 
+export type WebhookForwardResult = {
+  ok: boolean;
+  status: number | null;
+  body: unknown;
+};
+
 export class WebhookForwarder {
   constructor(private readonly config: Config) {}
 
@@ -18,10 +24,14 @@ export class WebhookForwarder {
     return JSON.parse(JSON.stringify(activity));
   }
 
-  async forward(event: string, activity: Activity): Promise<void> {
+  async forward(
+    event: string,
+    activity: Activity,
+    options: { timeoutMs?: number } = {},
+  ): Promise<WebhookForwardResult> {
     if (!this.config.LARAVEL_WEBHOOK_URL) {
       logWebhookForward(event, '(not configured)', 'skipped', 'LARAVEL_WEBHOOK_URL missing');
-      return;
+      return { ok: false, status: null, body: null };
     }
 
     const webhookUrl = this.config.LARAVEL_WEBHOOK_URL;
@@ -53,23 +63,47 @@ export class WebhookForwarder {
       headers['X-Teams-Signature'] = `sha256=${signature}`;
     }
 
+    const timeoutMs = options.timeoutMs ?? 10_000;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
       const response = await fetch(this.config.LARAVEL_WEBHOOK_URL, {
         method: 'POST',
         headers,
         body,
+        signal: controller.signal,
       });
 
+      const responseText = await response.text();
+      let responseBody: unknown = null;
+
+      if (responseText !== '') {
+        try {
+          responseBody = JSON.parse(responseText);
+        } catch {
+          responseBody = responseText;
+        }
+      }
+
       if (!response.ok) {
-        const responseBody = await response.text();
-        logWebhookForward(event, webhookUrl, 'failed', `HTTP ${response.status}: ${responseBody}`);
-        return;
+        logWebhookForward(
+          event,
+          webhookUrl,
+          'failed',
+          `HTTP ${response.status}: ${typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody)}`,
+        );
+        return { ok: false, status: response.status, body: responseBody };
       }
 
       logWebhookForward(event, webhookUrl, 'ok', `HTTP ${response.status}`);
+      return { ok: true, status: response.status, body: responseBody };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logWebhookForward(event, webhookUrl, 'failed', message);
+      return { ok: false, status: null, body: null };
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }
